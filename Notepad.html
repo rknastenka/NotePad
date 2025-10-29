@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="author" content="rknastenka" />
+  <link rel="author" href="https://github.com/rknastenka" />
+  <link rel="icon" type="image/png" href="icon.png" />
+  <title>Notepad</title>
+  <style>
+    :root {
+      --fs: 18px; 
+      --paper: #fff9c4;      
+      --paper-lines: rgba(0,0,0,0.08);
+      --paper-margin: #ff6666; 
+    }
+
+    * { box-sizing: border-box; }
+    html, body { 
+      height: 100%; 
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--paper);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      overflow: hidden;
+    }
+
+    .wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      color: #444;
+      font-size: 0.85rem;
+      background: rgba(255, 255, 255, 0.7);
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+
+
+    .editor {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      padding: 16px 2rem 3rem 4.5rem; 
+      outline: none;
+      border-radius: 0;
+      box-shadow: none;
+      overflow-y: auto;
+
+      background:
+        linear-gradient(to right, transparent 0 3.5rem, var(--paper-margin) 3.5rem 3.7rem, transparent 3.7rem),
+        repeating-linear-gradient(
+          to bottom,
+          var(--paper) 0 15px,
+          var(--paper-lines) 16px,
+          var(--paper) 17px 32px
+        );
+      color: #1a1a1a;
+      font-size: var(--fs);
+      line-height: 32px; /* matches the paper line spacing */
+      -webkit-user-modify: read-write-plaintext-only; /* keeps pasted text simple in Chromium */
+    }
+
+    /* Highlight style (used if execCommand hiliteColor is unavailable) */
+    mark, .hl { background: #ffec66; padding: 0 .05em; border-radius: 3px; }
+
+    footer {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div id="editor" class="editor" contenteditable="true" spellcheck="false" aria-label="Note editor"></div>
+  </div>
+
+  <script>
+    (function() {
+      const editor = document.getElementById('editor');
+      const LS_KEY = 'sticky-notepad-content-v1';
+      const LS_FS_KEY = 'sticky-notepad-fontsize-v1';
+
+      // Force contenteditable to use <br> instead of <p> for line breaks
+      document.execCommand('defaultParagraphSeparator', false, 'br');
+
+      // Restore saved note and font size
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved !== null) editor.innerHTML = saved;
+
+      const savedFs = localStorage.getItem(LS_FS_KEY);
+      if (savedFs) document.documentElement.style.setProperty('--fs', savedFs);
+
+      // Persist on changes (debounced for bursty inputs)
+      let t;
+      const saveNow = () => {
+        try { localStorage.setItem(LS_KEY, editor.innerHTML); } catch (e) {}
+      };
+      editor.addEventListener('input', () => {
+        clearTimeout(t);
+        t = setTimeout(saveNow, 150);
+      });
+
+      // Utility: change font size (in px) stored in CSS var
+      function getFs() {
+        const v = getComputedStyle(document.documentElement).getPropertyValue('--fs').trim();
+        return parseFloat(v) || 18;
+      }
+      function setFs(px) {
+        const clamped = Math.max(10, Math.min(48, px));
+        document.documentElement.style.setProperty('--fs', clamped + 'px');
+        try { localStorage.setItem(LS_FS_KEY, clamped + 'px'); } catch (e) {}
+      }
+
+      // Highlight fallback using <mark> if execCommand('hiliteColor') fails
+      function highlightSelection() {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+        const range = sel.getRangeAt(0);
+        // Try native highlight first (still widely supported)
+        const ok = document.execCommand && document.execCommand('hiliteColor', false, '#ffec66');
+        if (!ok) {
+          // Fallback wrap in <mark>
+          try {
+            const mark = document.createElement('mark');
+            range.surroundContents(mark);
+            sel.removeAllRanges(); sel.addRange(range);
+          } catch (_) {
+            // Complex ranges (spanning nodes) — fallback to simple insertion
+            document.execCommand('insertHTML', false, '<mark>' + sel.toString() + '</mark>');
+          }
+        }
+      }
+
+      // Keep focus in editor on click anywhere on the paper
+      document.addEventListener('click', (e) => {
+        if (e.target === editor) return; // already inside
+        if (editor.contains(e.target)) return;
+      }, true);
+
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        const mod = e.ctrlKey || e.metaKey; // support Cmd on macOS
+        if (!mod) return;
+
+        // Bold
+        if (e.key.toLowerCase() === 'b') {
+          e.preventDefault();
+          document.execCommand && document.execCommand('bold');
+          return;
+        }
+
+        // Highlight
+        if (e.key.toLowerCase() === 'h') {
+          e.preventDefault();
+          highlightSelection();
+          return;
+        }
+
+        // Bigger (supports both '=' and '+')
+        if (e.key === '+' || e.key === '=' ) {
+          e.preventDefault();
+          setFs(getFs() + 2);
+          return;
+        }
+
+        // Smaller
+        if (e.key === '-') {
+          e.preventDefault();
+          setFs(getFs() - 2);
+          return;
+        }
+
+        // Reset font size
+        if (e.key === '0') {
+          e.preventDefault();
+          setFs(18);
+          return;
+        }
+
+        // Prevent browser Save dialog (content autosaves anyway)
+        if (e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          saveNow();
+          return;
+        }
+      });
+
+      // Save before unload just in case
+      window.addEventListener('beforeunload', saveNow);
+    })();
+  </script>
+</body>
+</html>
