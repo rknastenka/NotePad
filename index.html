@@ -125,11 +125,21 @@
       color: #1a1a1a;
       font-size: var(--fs);
       line-height: 32px; /* matches the paper line spacing */
-      -webkit-user-modify: read-write-plaintext-only; /* keeps pasted text simple in Chromium */
     }
 
     /* Highlight style (used if execCommand hiliteColor is unavailable) */
     mark, .hl { background: #ffec66; padding: 0 .05em; border-radius: 3px; }
+
+    /* Image styles */
+    .editor img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 8px 0;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      cursor: pointer;
+    }
 
     footer {
       display: none;
@@ -204,6 +214,61 @@
         if (e.target === editor) return; // already inside
         if (editor.contains(e.target)) return;
       }, true);
+
+      // Handle image paste from clipboard
+      editor.addEventListener('paste', (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          
+          // Check if the item is an image
+          if (item.type.indexOf('image') !== -1) {
+            e.preventDefault(); // Prevent default paste behavior
+            
+            const blob = item.getAsFile();
+            const reader = new FileReader();
+            
+            reader.onload = (event) => {
+              const base64 = event.target.result;
+              
+              // Insert image at cursor position
+              const img = document.createElement('img');
+              img.src = base64;
+              img.alt = 'Pasted image';
+              
+              // Insert the image
+              const sel = window.getSelection();
+              if (sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(img);
+                
+                // Add a line break after image for better UX
+                const br = document.createElement('br');
+                range.collapse(false);
+                range.insertNode(br);
+                
+                // Move cursor after the break
+                range.setStartAfter(br);
+                range.setEndAfter(br);
+                sel.removeAllRanges();
+                sel.addRange(range);
+              } else {
+                editor.appendChild(img);
+                editor.appendChild(document.createElement('br'));
+              }
+              
+              // Trigger save
+              saveNow();
+            };
+            
+            reader.readAsDataURL(blob);
+            break; // Only handle the first image
+          }
+        }
+      });
 
       // Keyboard shortcuts
       document.addEventListener('keydown', (e) => {
