@@ -141,6 +141,37 @@
       cursor: pointer;
     }
 
+    /* Page switcher */
+    .page-switcher {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      display: flex;
+      gap: 0.01rem;
+      z-index: 100;
+    }
+
+    .page-btn {
+      width: 19px;
+      height: 19px;
+      border: none;
+      background: transparent;
+      color: #444;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .page-btn:hover {
+      color: #222;
+    }
+
+    .page-btn.active {
+      font-weight: 700;
+      text-decoration: underline;
+    }
+
     footer {
       display: none;
     }
@@ -152,18 +183,40 @@
     <div id="editor" class="editor" contenteditable="true" spellcheck="false" aria-label="Note editor"></div>
   </div>
 
+  <!-- Page switcher -->
+  <div class="page-switcher">
+    <button class="page-btn active" data-page="1">1</button>
+    <button class="page-btn" data-page="2">2</button>
+    <button class="page-btn" data-page="3">3</button>
+  </div>
+
   <script>
     (function() {
       const editor = document.getElementById('editor');
-      const LS_KEY = 'sticky-notepad-content-v1';
+      const LS_KEY_PREFIX = 'sticky-notepad-content-v1-page-';
       const LS_FS_KEY = 'sticky-notepad-fontsize-v1';
+      const LS_CURRENT_PAGE = 'sticky-notepad-current-page-v1';
+
+      let currentPage = parseInt(localStorage.getItem(LS_CURRENT_PAGE)) || 1;
 
       // Force contenteditable to use <br> instead of <p> for line breaks
       document.execCommand('defaultParagraphSeparator', false, 'br');
 
-      // Restore saved note and font size
-      const saved = localStorage.getItem(LS_KEY);
-      if (saved !== null) editor.innerHTML = saved;
+      // Load page content
+      function loadPage(pageNum) {
+        const saved = localStorage.getItem(LS_KEY_PREFIX + pageNum);
+        editor.innerHTML = saved !== null ? saved : '';
+        currentPage = pageNum;
+        localStorage.setItem(LS_CURRENT_PAGE, pageNum);
+        
+        // Update active button
+        document.querySelectorAll('.page-btn').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.page == pageNum);
+        });
+      }
+
+      // Initial load
+      loadPage(currentPage);
 
       const savedFs = localStorage.getItem(LS_FS_KEY);
       if (savedFs) document.documentElement.style.setProperty('--fs', savedFs);
@@ -171,11 +224,19 @@
       // Persist on changes (debounced for bursty inputs)
       let t;
       const saveNow = () => {
-        try { localStorage.setItem(LS_KEY, editor.innerHTML); } catch (e) {}
+        try { localStorage.setItem(LS_KEY_PREFIX + currentPage, editor.innerHTML); } catch (e) {}
       };
       editor.addEventListener('input', () => {
         clearTimeout(t);
         t = setTimeout(saveNow, 150);
+      });
+
+      // Page switcher click handlers
+      document.querySelectorAll('.page-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          saveNow(); // Save current page before switching
+          loadPage(parseInt(btn.dataset.page));
+        });
       });
 
       // Utility: change font size (in px) stored in CSS var
