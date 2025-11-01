@@ -10,7 +10,7 @@ So I built this for myself and for anyone who might benefit from it.
 - Works offline  
 - Automatically saves to local storage
 - Common hotkeys:
-    -  **Bold Text** — `Ctrl` / `⌘` + **B**
+    - **Bold Text** — `Ctrl` / `⌘` + **B**
     - **Highlight Text** — `Ctrl` / `⌘` + **H**
     - **Increase Font Size** — `Ctrl` / `⌘` + **+**
     - **Decrease Font Size** — `Ctrl` / `⌘` + **-**
