@@ -68,7 +68,7 @@
       --fs: 18px; 
       --paper: #fff9c4;      
       --paper-lines: rgba(0,0,0,0.08);
-      --paper-margin: #ff6666; 
+      --paper-margin: #0025bb; 
     }
 
     * { box-sizing: border-box; }
@@ -115,7 +115,7 @@
       overflow-y: auto;
 
       background:
-        linear-gradient(to right, transparent 0 3.5rem, var(--paper-margin) 3.5rem 3.7rem, transparent 3.7rem),
+        linear-gradient(to right, transparent 0 3.5rem, var(--paper-margin) 3.5rem 3.65rem, transparent 3.65rem),
         repeating-linear-gradient(
           to bottom,
           var(--paper) 0 15px,
@@ -225,6 +225,21 @@
     .editor {
       scrollbar-width: thin;
       scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+    }
+
+    /* Mobile view - reduce left margin */
+    @media (max-width: 768px) {
+      .editor {
+        padding-left: 2.5rem;
+        background:
+          linear-gradient(to right, transparent 0 2rem, var(--paper-margin) 2rem 2.15rem, transparent 2.15rem),
+          repeating-linear-gradient(
+            to bottom,
+            var(--paper) 0 15px,
+            var(--paper-lines) 16px,
+            var(--paper) 17px 32px
+          );
+      }
     }
   </style>
 </head>
