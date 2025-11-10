@@ -9,12 +9,17 @@ So I built this for myself and for anyone who might benefit from it.
 - No save / sync / login  
 - Works offline  
 - Automatically saves to local storage
+- Multiple pages (page switcher at bottom right)
+- Paste images directly from clipboard
+- Interactive checkboxes (type `- [ ]` to create a checkbox)
 - Common hotkeys:
     - **Bold Text** — `Ctrl` / `⌘` + **B**
     - **Highlight Text** — `Ctrl` / `⌘` + **H**
     - **Increase Font Size** — `Ctrl` / `⌘` + **+**
     - **Decrease Font Size** — `Ctrl` / `⌘` + **-**
     - **Reset Font Size** — `Ctrl` / `⌘` + **0**
+    - **Strikethrough Text** — `Shift` + **-**
+
 
 
 Chech out the most *Minimilist* NotePad on earth [here](https://notepad.rknastenka.com/).
