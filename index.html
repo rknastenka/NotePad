@@ -141,6 +141,32 @@
       cursor: pointer;
     }
 
+    /* Checkbox styles - minimal and larger */
+    .editor input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      margin-right: 5px;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      border: 2px solid #666;
+      border-radius: 4px;
+      background: transparent;
+      vertical-align: middle;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    .editor input[type="checkbox"]:hover {
+      border-color: #333;
+    }
+
+    .editor input[type="checkbox"]:checked {
+      background: #000;
+      border-color: #000;
+    }
+
     /* Page switcher */
     .page-switcher {
       position: fixed;
@@ -251,7 +277,61 @@
       const saveNow = () => {
         try { localStorage.setItem(LS_KEY_PREFIX + currentPage, editor.innerHTML); } catch (e) {}
       };
-      editor.addEventListener('input', () => {
+      editor.addEventListener('input', (e) => {
+        // Check for checkbox pattern: - [ ]
+        if (e.inputType === 'insertText' || e.inputType === 'insertLineBreak') {
+          const sel = window.getSelection();
+          if (sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            const node = range.startContainer;
+            
+            if (node.nodeType === Node.TEXT_NODE) {
+              const text = node.textContent;
+              const cursorPos = range.startOffset;
+              
+              // Look for "- [ ]" pattern (with space after closing bracket)
+              const beforeCursor = text.substring(0, cursorPos);
+              const match = beforeCursor.match(/- \[ \]$/);
+              
+              if (match) {
+                e.preventDefault();
+                
+                // Get the position where the pattern starts
+                const patternStart = cursorPos - match[0].length;
+                
+                // Create checkbox
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                
+                // Add event listener to save when checkbox is toggled
+                checkbox.addEventListener('change', saveNow);
+                
+                // Split the text node
+                const beforePattern = text.substring(0, patternStart);
+                const afterPattern = text.substring(cursorPos);
+                
+                // Create new text nodes
+                const beforeNode = document.createTextNode(beforePattern);
+                const afterNode = document.createTextNode(afterPattern);
+                
+                // Get parent and replace
+                const parent = node.parentNode;
+                parent.insertBefore(beforeNode, node);
+                parent.insertBefore(checkbox, node);
+                parent.insertBefore(afterNode, node);
+                parent.removeChild(node);
+                
+                // Set cursor after checkbox
+                const newRange = document.createRange();
+                newRange.setStart(afterNode, 0);
+                newRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+              }
+            }
+          }
+        }
+        
         clearTimeout(t);
         t = setTimeout(saveNow, 150);
       });
@@ -358,6 +438,13 @@
 
       // Keyboard shortcuts
       document.addEventListener('keydown', (e) => {
+        // Strikethrough with Shift + -
+        if (e.shiftKey && e.key === '_') {
+          e.preventDefault();
+          document.execCommand && document.execCommand('strikethrough');
+          return;
+        }
+
         const mod = e.ctrlKey || e.metaKey; // support Cmd on macOS
         if (!mod) return;
 
