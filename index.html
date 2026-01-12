@@ -103,19 +103,87 @@
       flex-shrink: 0;
     }
 
+    .editors-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .editor-pane {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      min-width: 200px;
+      overflow: hidden;
+    }
+
+    .editor-pane:first-child {
+      flex-basis: 50%;
+    }
+
+    .editor-pane:last-child {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    /* Resizable divider */
+    .divider {
+      width: 8px;
+      background: transparent;
+      cursor: col-resize;
+      position: relative;
+      flex-shrink: 0;
+      z-index: 10;
+      transition: background 0.2s ease;
+    }
+
+    .divider::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(0, 0, 0, 0.15);
+      transform: translateX(-50%);
+      transition: background 0.2s ease;
+    }
+
+    .divider:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    .divider:hover::before {
+      background: rgba(0, 0, 0, 0.3);
+      width: 3px;
+    }
+
+    .divider.dragging {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .divider.dragging::before {
+      background: rgba(0, 0, 0, 0.4);
+      width: 3px;
+    }
+
+    /* Remove old border */
+    .editor-pane + .editor-pane {
+      border-left: none;
+    }
 
     .editor {
       flex: 1;
       width: 100%;
       height: 100%;
-      padding: 16px 2rem 3rem 4.5rem; 
+      padding: 16px 2rem 3.5rem 2rem; 
       outline: none;
       border-radius: 0;
       box-shadow: none;
       overflow-y: auto;
 
       background:
-        linear-gradient(to right, transparent 0 3.5rem, var(--paper-margin) 3.5rem 3.65rem, transparent 3.65rem),
         repeating-linear-gradient(
           to bottom,
           var(--paper) 0 15px,
@@ -205,7 +273,7 @@
     /* Custom scrollbar - minimal and less distracting */
     /* WebKit browsers (Chrome, Safari, Edge) */
     .editor::-webkit-scrollbar {
-      width: 6px;
+      width: 2px;
     }
 
     .editor::-webkit-scrollbar-track {
@@ -214,11 +282,11 @@
 
     .editor::-webkit-scrollbar-thumb {
       background: rgba(0, 0, 0, 0.15);
-      border-radius: 3px;
+      border-radius: 2px;
     }
 
     .editor::-webkit-scrollbar-thumb:hover {
-      background: rgba(0, 0, 0, 0.25);
+      background: rgba(0, 0, 0, 0.08);
     }
 
     /* Firefox */
@@ -227,12 +295,29 @@
       scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
     }
 
-    /* Mobile view - reduce left margin */
+    /* Mobile view - stack vertically and reduce left margin */
     @media (max-width: 768px) {
+      .editors-container {
+        flex-direction: column;
+      }
+
+      .divider {
+        display: none;
+      }
+
+      .editor-pane {
+        flex: 1 !important;
+        flex-basis: auto !important;
+        min-width: 0 !important;
+      }
+
+      .editor-pane + .editor-pane {
+        border-top: 2px solid rgba(0, 0, 0, 0.15);
+      }
+
       .editor {
-        padding-left: 2.5rem;
+        padding-left: 1rem;
         background:
-          linear-gradient(to right, transparent 0 2rem, var(--paper-margin) 2rem 2.15rem, transparent 2.15rem),
           repeating-linear-gradient(
             to bottom,
             var(--paper) 0 15px,
@@ -245,12 +330,26 @@
 </head>
 <body>
   <div class="wrap">
+    <div class="editors-container">
+      <!-- Left Pane -->
+      <div class="editor-pane" id="left-pane">
+        <div id="editor-left" class="editor" contenteditable="true" spellcheck="false" aria-label="Left note editor"></div>
+      </div>
 
-    <div id="editor" class="editor" contenteditable="true" spellcheck="false" aria-label="Note editor"></div>
+      <!-- Draggable Divider -->
+      <div class="divider" id="divider"></div>
+
+      <!-- Right Pane -->
+      <div class="editor-pane" id="right-pane">
+        <div id="editor-right" class="editor" contenteditable="true" spellcheck="false" aria-label="Right note editor"></div>
+      </div>
+    </div>
   </div>
 
   <!--  Thank you for using Notepad, here to provide the most minimalistic experience <3 -->
   <!--  Smile and enjoy your day  :< -> :>   -->
+  
+  <!-- Global Page Switcher -->
   <div class="page-switcher">
     <button class="page-btn active" data-page="1">1</button>
     <button class="page-btn" data-page="2">2</button>
@@ -258,20 +357,75 @@
 
   <script>
     (function() {
-      const editor = document.getElementById('editor');
-      const LS_KEY_PREFIX = 'sticky-notepad-content-v1-page-';
+      const editorLeft = document.getElementById('editor-left');
+      const editorRight = document.getElementById('editor-right');
+      const leftPane = document.getElementById('left-pane');
+      const rightPane = document.getElementById('right-pane');
+      const divider = document.getElementById('divider');
+      const container = document.querySelector('.editors-container');
+      
+      const LS_KEY_PREFIX_LEFT = 'sticky-notepad-left-content-v2-page-';
+      const LS_KEY_PREFIX_RIGHT = 'sticky-notepad-right-content-v2-page-';
       const LS_FS_KEY = 'sticky-notepad-fontsize-v1';
-      const LS_CURRENT_PAGE = 'sticky-notepad-current-page-v1';
+      const LS_CURRENT_PAGE = 'sticky-notepad-current-page-v2';
+      const LS_SPLIT_POS = 'sticky-notepad-split-position-v1';
 
       let currentPage = parseInt(localStorage.getItem(LS_CURRENT_PAGE)) || 1;
+
+      // Restore saved split position
+      const savedSplit = localStorage.getItem(LS_SPLIT_POS);
+      if (savedSplit) {
+        leftPane.style.flexBasis = savedSplit;
+      }
+
+      // Divider drag functionality
+      let isDragging = false;
+      
+      divider.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        divider.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const offsetX = e.clientX - containerRect.left;
+        const percentage = (offsetX / containerRect.width) * 100;
+        
+        // Clamp between 20% and 80% to prevent too small panes
+        const clampedPercentage = Math.max(20, Math.min(80, percentage));
+        leftPane.style.flexBasis = clampedPercentage + '%';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          divider.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          
+          // Save split position
+          try {
+            localStorage.setItem(LS_SPLIT_POS, leftPane.style.flexBasis);
+          } catch (e) {}
+        }
+      });
 
       // Force contenteditable to use <br> instead of <p> for line breaks
       document.execCommand('defaultParagraphSeparator', false, 'br');
 
-      // Load page content
+      // Load page content for both panes
       function loadPage(pageNum) {
-        const saved = localStorage.getItem(LS_KEY_PREFIX + pageNum);
-        editor.innerHTML = saved !== null ? saved : '';
+        const savedLeft = localStorage.getItem(LS_KEY_PREFIX_LEFT + pageNum);
+        const savedRight = localStorage.getItem(LS_KEY_PREFIX_RIGHT + pageNum);
+        
+        editorLeft.innerHTML = savedLeft !== null ? savedLeft : '';
+        editorRight.innerHTML = savedRight !== null ? savedRight : '';
+        
         currentPage = pageNum;
         localStorage.setItem(LS_CURRENT_PAGE, pageNum);
         
@@ -288,73 +442,88 @@
       if (savedFs) document.documentElement.style.setProperty('--fs', savedFs);
 
       // Persist on changes (debounced for bursty inputs)
-      let t;
-      const saveNow = () => {
-        try { localStorage.setItem(LS_KEY_PREFIX + currentPage, editor.innerHTML); } catch (e) {}
+      let tLeft, tRight;
+      
+      const saveNow = (pane) => {
+        const editor = pane === 'left' ? editorLeft : editorRight;
+        const prefix = pane === 'left' ? LS_KEY_PREFIX_LEFT : LS_KEY_PREFIX_RIGHT;
+        try { localStorage.setItem(prefix + currentPage, editor.innerHTML); } catch (e) {}
       };
-      editor.addEventListener('input', (e) => {
-        // Check for checkbox pattern: - [ ]
-        if (e.inputType === 'insertText' || e.inputType === 'insertLineBreak') {
-          const sel = window.getSelection();
-          if (sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0);
-            const node = range.startContainer;
-            
-            if (node.nodeType === Node.TEXT_NODE) {
-              const text = node.textContent;
-              const cursorPos = range.startOffset;
+
+      // Setup input handler for an editor
+      function setupEditorHandlers(editor, pane) {
+        editor.addEventListener('input', (e) => {
+          // Check for checkbox pattern: - [ ]
+          if (e.inputType === 'insertText' || e.inputType === 'insertLineBreak') {
+            const sel = window.getSelection();
+            if (sel.rangeCount > 0) {
+              const range = sel.getRangeAt(0);
+              const node = range.startContainer;
               
-              // Look for "- [ ]" pattern (with space after closing bracket)
-              const beforeCursor = text.substring(0, cursorPos);
-              const match = beforeCursor.match(/- \[ \]$/);
-              
-              if (match) {
-                e.preventDefault();
+              if (node.nodeType === Node.TEXT_NODE) {
+                const text = node.textContent;
+                const cursorPos = range.startOffset;
                 
-                // Get the position where the pattern starts
-                const patternStart = cursorPos - match[0].length;
+                // Look for "- [ ]" pattern (with space after closing bracket)
+                const beforeCursor = text.substring(0, cursorPos);
+                const match = beforeCursor.match(/- \[ \]$/);
                 
-                // Create checkbox
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                
-                // Add event listener to save when checkbox is toggled
-                checkbox.addEventListener('change', saveNow);
-                
-                // Split the text node
-                const beforePattern = text.substring(0, patternStart);
-                const afterPattern = text.substring(cursorPos);
-                
-                // Create new text nodes
-                const beforeNode = document.createTextNode(beforePattern);
-                const afterNode = document.createTextNode(afterPattern);
-                
-                // Get parent and replace
-                const parent = node.parentNode;
-                parent.insertBefore(beforeNode, node);
-                parent.insertBefore(checkbox, node);
-                parent.insertBefore(afterNode, node);
-                parent.removeChild(node);
-                
-                // Set cursor after checkbox
-                const newRange = document.createRange();
-                newRange.setStart(afterNode, 0);
-                newRange.collapse(true);
-                sel.removeAllRanges();
-                sel.addRange(newRange);
+                if (match) {
+                  e.preventDefault();
+                  
+                  // Get the position where the pattern starts
+                  const patternStart = cursorPos - match[0].length;
+                  
+                  // Create checkbox
+                  const checkbox = document.createElement('input');
+                  checkbox.type = 'checkbox';
+                  
+                  // Add event listener to save when checkbox is toggled
+                  checkbox.addEventListener('change', () => saveNow(pane));
+                  
+                  // Split the text node
+                  const beforePattern = text.substring(0, patternStart);
+                  const afterPattern = text.substring(cursorPos);
+                  
+                  // Create new text nodes
+                  const beforeNode = document.createTextNode(beforePattern);
+                  const afterNode = document.createTextNode(afterPattern);
+                  
+                  // Get parent and replace
+                  const parent = node.parentNode;
+                  parent.insertBefore(beforeNode, node);
+                  parent.insertBefore(checkbox, node);
+                  parent.insertBefore(afterNode, node);
+                  parent.removeChild(node);
+                  
+                  // Set cursor after checkbox
+                  const newRange = document.createRange();
+                  newRange.setStart(afterNode, 0);
+                  newRange.collapse(true);
+                  sel.removeAllRanges();
+                  sel.addRange(newRange);
+                }
               }
             }
           }
-        }
-        
-        clearTimeout(t);
-        t = setTimeout(saveNow, 150);
-      });
+          
+          const timer = pane === 'left' ? tLeft : tRight;
+          clearTimeout(timer);
+          const newTimer = setTimeout(() => saveNow(pane), 150);
+          if (pane === 'left') tLeft = newTimer;
+          else tRight = newTimer;
+        });
+      }
 
-      // Page switcher click handlers
+      // Setup both editors
+      setupEditorHandlers(editorLeft, 'left');
+      setupEditorHandlers(editorRight, 'right');
+
+      // Page switcher click handler
       document.querySelectorAll('.page-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          saveNow(); // Save current page before switching
+          saveNow('left');  // Save both panes before switching
+          saveNow('right');
           loadPage(parseInt(btn.dataset.page));
         });
       });
@@ -390,14 +559,9 @@
         }
       }
 
-      // Keep focus in editor on click anywhere on the paper
-      document.addEventListener('click', (e) => {
-        if (e.target === editor) return; // already inside
-        if (editor.contains(e.target)) return;
-      }, true);
-
-      // Handle image paste from clipboard
-      editor.addEventListener('paste', (e) => {
+      // Handle image paste from clipboard for both editors
+      function setupPasteHandler(editor, pane) {
+        editor.addEventListener('paste', (e) => {
         const items = e.clipboardData?.items;
         if (!items) return;
 
@@ -442,17 +606,26 @@
               }
               
               // Trigger save
-              saveNow();
+              saveNow(pane);
             };
             
             reader.readAsDataURL(blob);
             break; // Only handle the first image
           }
         }
-      });
+        });
+      }
 
-      // Keyboard shortcuts
+      setupPasteHandler(editorLeft, 'left');
+      setupPasteHandler(editorRight, 'right');
+
+      // Keyboard shortcuts - work with whichever editor has focus
       document.addEventListener('keydown', (e) => {
+        const activeEl = document.activeElement;
+        const isLeftEditor = activeEl === editorLeft;
+        const isRightEditor = activeEl === editorRight;
+        const currentPane = isLeftEditor ? 'left' : isRightEditor ? 'right' : null;
+        
         // Strikethrough with Shift + -
         if (e.shiftKey && e.key === '_') {
           e.preventDefault();
@@ -501,13 +674,16 @@
         // Prevent browser Save dialog (content autosaves anyway)
         if (e.key.toLowerCase() === 's') {
           e.preventDefault();
-          saveNow();
+          if (currentPane) saveNow(currentPane);
           return;
         }
       });
 
       // Save before unload just in case
-      window.addEventListener('beforeunload', saveNow);
+      window.addEventListener('beforeunload', () => {
+        saveNow('left');
+        saveNow('right');
+      });
     })();
   </script>
 </body>
